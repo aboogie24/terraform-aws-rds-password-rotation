@@ -19,6 +19,29 @@ def lambda_handler(event, context):
     update_parameter_store(new_password)
     reset_master_password(new_password)
 
+def slack_notification(): 
+    region = 'us-west-1'
+
+
+    url = "https://hooks.slack.com/services/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"
+    
+    # Update the payload information 
+    payload = '{ \"attachments\":[\n      {\n         \"fallback\":\"Jenkins: <http://localhost:8080/|Open Jenkins Build server here>\",\n         \"pretext\":\"Jenkins: <http://localhost:8080/|Open Jenkins Build server here>\",\n         \"color\":\"#34bb13\",\n         \"fields\":[\n            {\n               \"title\":\"Password Reset\",\n               \"value\":\"Parmeter Store Password has been reset\"\n            }\n         ]\n      }\n   ]\n }'
+    headers = {
+        'Content-Type': "application/json",
+        'User-Agent': "PostmanRuntime/7.19.0",
+        'Accept': "*/*",
+        'Cache-Control': "no-cache",
+        'Postman-Token': "56df98df-XXXX-XXXX-XXXX-9a2k5q56b8gf,458sadwa-XXXX-XXXX-XXXX-p456z4564a45",
+        'Host': "hooks.slack.com",
+        'Accept-Encoding': "gzip, deflate",
+        'Content-Length': "497",
+        'Connection': "keep-alive",
+        'cache-control': "no-cache"
+        }
+    response = requests.request("POST", url, data=payload, headers=headers)
+    print(response.text)
+
 def generate_pass():
     # Define length of password
     # Create random Password
@@ -65,5 +88,6 @@ def reset_master_password(new_password):
         response = client.modify_db_instance( DBInstanceIdentifier=DB_NAME, MasterUserPassword=NEW)
         print("Master Password Updated")
         print("   value: " + NEW)
+        slack_notification()
     except:
         print("Error updating Master Password")

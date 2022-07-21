@@ -12,11 +12,12 @@ SSM_PARAM = os.environ.get("SSM_PARAMETER")
 REGION = os.environ.get("REGION")
 DB_NAME = os.environ.get("DB_NAME")
 SLACK_URL = os.environ.get("SLACK_URL")
+ENV = os.environ.get("ENV")
 
 E_MESSAGE = ["PARAMETER STORE not updated correctly","Parameter Store value and New generated password doesn't match", "Error updating Master Password on RDS Instance "]
-S_MESSAGE = ["PARAMETER STORE UPDATE AND MASTER PASSWORD CHANGED"]
+S_MESSAGE = "PARAMETER STORE UPDATE AND MASTER PASSWORD CHANGED"
 
-DATE = datetime.datetime.now().strftime("%m%d%Y, %H:%M:%S")
+DATE = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
 
 
 def lambda_handler(event, context):
@@ -26,7 +27,7 @@ def lambda_handler(event, context):
     reset_master_password(new_password)
 
 
-def set_payload(status, message, date): 
+def set_payload(status, message, date, env): 
     pay = {
     	"blocks": [
     		{
@@ -46,7 +47,7 @@ def set_payload(status, message, date):
     				},
     				{
     					"type": "mrkdwn",
-    					"text": "*Created by:*\n"
+    					"text": "*ENV*\n" + env
     				}
     			]
     		},
@@ -78,7 +79,7 @@ def slack_notification(status, message):
     region = 'us-west-1'
     
     # For TESTing SET SLACk_URL 
-    SLACK_URL = "https://hooks.slack.com/services/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"
+    SLACK_URL = "https://hooks.slack.com/services/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"
 
     url = "https://hooks.slack.com/services/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"
 
@@ -96,7 +97,7 @@ def slack_notification(status, message):
         'Connection': "keep-alive",
         'cache-control': "no-cache"
         }
-    response = requests.request("POST", url, data=set_payload(status, message, DATE), headers=headers)
+    response = requests.request('POST', SLACK_URL, data=set_payload(status, message, DATE, ENV), headers=headers)
     print(response.text)
 
 def generate_pass():
@@ -110,17 +111,18 @@ def generate_pass():
 def get_current_param(): 
     ssm = boto3.client('ssm')
 
-    return ssm.get_parameter(Name=SSM_PARAM, WithDecryption=True)
+    current_param = ssm.get_parameter(Name=SSM_PARAM, WithDecryption=True)
+    return current_param['Parameter']['Value']
 
 def update_parameter_store(new_password):
     ssm = boto3.client('ssm')
 
     # Sets the new password in Parameter store
     try:
-      current_param = get_current_param()
+      
       ssm.put_parameter(Name=SSM_PARAM, Value=new_password, Overwrite=True, Type='SecureString')
       print("Parameter Store Value Updated" + SSM_PARAM)
-      
+      new_param = get_current_param()
     except:
       e = sys.exc_info()[0]
       print(e)
@@ -128,8 +130,10 @@ def update_parameter_store(new_password):
       MESSAGE = E_MESSAGE[0] + " for" + SSM_PARAM
       slack_notification(STATUS, MESSAGE)
       sys.exit()
-      
-    if current_param != new_password: 
+    
+    print(new_param)
+    print(new_password)
+    if new_param != new_password: 
         STATUS = "FAILED"
         slack_notification(STATUS, E_MESSAGE[1])
         sys.exit()
@@ -151,7 +155,7 @@ def reset_master_password(new_password):
         
     except:
         print("Updating Master Password FAILED")
-
+    
     if response != "": 
         STATUS = "SUCCESFULL"
         MESSAGE = S_MESSAGE

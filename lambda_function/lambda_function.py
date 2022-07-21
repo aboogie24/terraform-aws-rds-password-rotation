@@ -13,9 +13,8 @@ REGION = os.environ.get("REGION")
 DB_NAME = os.environ.get("DB_NAME")
 SLACK_URL = os.environ.get("SLACK_URL")
 
-# SET DATE 
-
-E_MESSAGE = ["PARAMETER STORE not updated correctly","Parameter Store value and New generated password doesn't match", "Error updating Master Password", ]
+E_MESSAGE = ["PARAMETER STORE not updated correctly","Parameter Store value and New generated password doesn't match", "Error updating Master Password on RDS Instance "]
+S_MESSAGE = ["PARAMETER STORE UPDATE AND MASTER PASSWORD CHANGED"]
 
 DATE = datetime.datetime.now().strftime("%m%d%Y, %H:%M:%S")
 
@@ -120,18 +119,20 @@ def update_parameter_store(new_password):
     # Sets the new password in Parameter store
     try:
       ssm.put_parameter(Name=SSM_PARAM, Value=new_password, Overwrite=True, Type='SecureString')
-      print("New Parameter Store Value: " + new_password)
+      print("Parameter Store Value Updated" + SSM_PARAM)
       
     except:
       e = sys.exc_info()[0]
       print(e)
       STATUS = "FAILED"
-      slack_notification(STATUS, E_MESSAGE[0])
+      MESSAGE = E_MESSAGE[0] + " for" + SSM_PARAM
+      slack_notification(STATUS, MESSAGE)
       sys.exit()
       
     if get_current_param() != new_pasword: 
         STATUS = "FAILED"
         slack_notification(STATUS, E_MESSAGE[1])
+        sys.exit()
 
 def reset_master_password(new_password):
     NEW = new_password
@@ -142,14 +143,24 @@ def reset_master_password(new_password):
             'max_attempts': 10,
             'mode': 'standard'
         })
-
-    client = boto3.client('rds', config=my_config)
-
     #Sets the new master password on the RDS DB instance
     try:
+        client = boto3.client('rds', config=my_config)
         response = client.modify_db_instance( DBInstanceIdentifier=DB_NAME, MasterUserPassword=NEW)
         print("Master Password Updated")
-        print("   value: " + NEW)
-        slack_notification()
+        
     except:
-        print("Error updating Master Password")
+        print("Updating Master Password FAILED")
+
+    if response != "": 
+        STATUS = "SUCCESFULL"
+        MESSAGE = S_MESSAGE
+    else: 
+        STATUS = "FAILED"
+        MESSAGE = E_MESSAGE[2] + DB_NAME
+    
+    slack_notification(STATUS, MESSAGE)
+
+    
+
+

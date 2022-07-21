@@ -4,7 +4,7 @@ import string
 import random
 import time
 import os
-import sys
+import sys, datetime
 from botocore.vendored import requests
 from botocore.config import Config
 

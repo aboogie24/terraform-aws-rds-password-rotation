@@ -66,3 +66,8 @@ variable "db_name" {
   description = "Database Target Name"
   type = string
 }
+
+variable "slack_url" {
+  description = "Webhood for slack endpoint"
+  type = string
+}

@@ -127,7 +127,8 @@ resource "aws_lambda_function" "function" {
     variables = {
       "SSM_PARAMETER" = "/${var.ssm_parameter_value}",
       "DB_NAME" = "${var.db_name}", 
-      "REGION" = var.region
+      "REGION" = var.region, 
+      "SLACK_URL" = var.slack_url
     }
   }
 

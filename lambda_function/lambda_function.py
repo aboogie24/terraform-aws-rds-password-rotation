@@ -118,6 +118,7 @@ def update_parameter_store(new_password):
 
     # Sets the new password in Parameter store
     try:
+      current_param = get_current_param()
       ssm.put_parameter(Name=SSM_PARAM, Value=new_password, Overwrite=True, Type='SecureString')
       print("Parameter Store Value Updated" + SSM_PARAM)
       
@@ -129,7 +130,7 @@ def update_parameter_store(new_password):
       slack_notification(STATUS, MESSAGE)
       sys.exit()
       
-    if get_current_param() != new_pasword: 
+    if current_param != new_password: 
         STATUS = "FAILED"
         slack_notification(STATUS, E_MESSAGE[1])
         sys.exit()

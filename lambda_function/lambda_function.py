@@ -11,6 +11,13 @@ from botocore.config import Config
 SSM_PARAM = os.environ.get("SSM_PARAMETER")
 REGION = os.environ.get("REGION")
 DB_NAME = os.environ.get("DB_NAME")
+SLACK_URL = os.environ.get("SLACK_URL")
+
+# SET DATE 
+
+E_MESSAGE = ["PARAMETER STORE not updated correctly","Parameter Store value and New generated password doesn't match", "Error updating Master Password", ]
+
+DATE = datetime.datetime.now().strftime("%m%d%Y, %H:%M:%S")
 
 
 def lambda_handler(event, context):
@@ -19,14 +26,66 @@ def lambda_handler(event, context):
     update_parameter_store(new_password)
     reset_master_password(new_password)
 
+
+def set_payload(status, message): 
+    pay = {
+    	"blocks": [
+    		{
+    			"type": "header",
+    			"text": {
+    				"type": "plain_text",
+    				"text": "RDS MASTER PASSWORD UPDATED"
+    				
+    			}
+    		},
+    		{
+    			"type": "section",
+    			"fields": [
+    				{
+    					"type": "mrkdwn",
+    					"text": "*STATUS:*\n" + status
+    				},
+    				{
+    					"type": "mrkdwn",
+    					"text": "*Created by:*\n"
+    				}
+    			]
+    		},
+    		{
+    			"type": "context",
+    			"elements": [
+    				{
+    					"type": "plain_text",
+    					"text": message
+    				}
+    			]
+    		},
+    		{
+    			"type": "section",
+    			"fields": [
+    				{
+    					"type": "mrkdwn",
+    					"text": "*When:*\n" + date
+    				}
+    			]
+    		}
+    	]
+    }
+    payload = json.dumps(pay)
+    return payload
+
+
 def slack_notification(): 
     region = 'us-west-1'
-
+    
+    # For TESTing SET SLACk_URL 
+    SLACK_URL = "https://hooks.slack.com/services/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"
 
     url = "https://hooks.slack.com/services/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"
     
+
     # Update the payload information 
-    payload = '{ \"attachments\":[\n      {\n         \"fallback\":\"Jenkins: <http://localhost:8080/|Open Jenkins Build server here>\",\n         \"pretext\":\"Jenkins: <http://localhost:8080/|Open Jenkins Build server here>\",\n         \"color\":\"#34bb13\",\n         \"fields\":[\n            {\n               \"title\":\"Password Reset\",\n               \"value\":\"Parmeter Store Password has been reset\"\n            }\n         ]\n      }\n   ]\n }'
+    
     headers = {
         'Content-Type': "application/json",
         'User-Agent': "PostmanRuntime/7.19.0",
@@ -39,7 +98,7 @@ def slack_notification():
         'Connection': "keep-alive",
         'cache-control': "no-cache"
         }
-    response = requests.request("POST", url, data=payload, headers=headers)
+    response = requests.request("POST", url, data=set_payload(status, message), headers=headers)
     print(response.text)
 
 def generate_pass():
@@ -50,12 +109,13 @@ def generate_pass():
     result_str = "".join((random.choice(source) for i in range(length)))
     return result_str
 
-def update_parameter_store(new_password):
+def get_current_param(): 
     ssm = boto3.client('ssm')
 
-    # Gets the current password set in parameter store
-    # Make sure to variablize the path string
-    parameter = ssm.get_parameter(Name=SSM_PARAM, WithDecryption=True)
+    return ssm.get_parameter(Name=SSM_PARAM, WithDecryption=True)
+
+def update_parameter_store(new_password):
+    ssm = boto3.client('ssm')
 
     # Sets the new password in Parameter store
     try:
@@ -65,11 +125,13 @@ def update_parameter_store(new_password):
     except:
       e = sys.exc_info()[0]
       print(e)
+      STATUS = "FAILED"
+      slack_notification(STATUS, E_MESSAGE[0])
       sys.exit()
       
-
-    # Ensure the password has been set in parameter store by pulling the new password
-    parameter = ssm.get_parameter(Name=SSM_PARAM, WithDecryption=True)
+    if get_current_param() != new_pasword: 
+        STATUS = "FAILED"
+        slack_notification(STATUS, E_MESSAGE[1])
 
 def reset_master_password(new_password):
     NEW = new_password

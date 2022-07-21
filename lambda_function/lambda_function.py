@@ -4,13 +4,20 @@ import string
 import random
 import time
 import os
-import sys
+import sys, datetime
 from botocore.vendored import requests
 from botocore.config import Config
 
 SSM_PARAM = os.environ.get("SSM_PARAMETER")
 REGION = os.environ.get("REGION")
 DB_NAME = os.environ.get("DB_NAME")
+SLACK_URL = os.environ.get("SLACK_URL")
+ENV = os.environ.get("ENV")
+
+E_MESSAGE = ["PARAMETER STORE not updated correctly","Parameter Store value and New generated password doesn't match", "Error updating Master Password on RDS Instance "]
+S_MESSAGE = "PARAMETER STORE UPDATE AND MASTER PASSWORD CHANGED"
+
+DATE = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
 
 
 def lambda_handler(event, context):
@@ -19,14 +26,65 @@ def lambda_handler(event, context):
     update_parameter_store(new_password)
     reset_master_password(new_password)
 
-def slack_notification(): 
+
+def set_payload(status, message, date, env): 
+    pay = {
+    	"blocks": [
+    		{
+    			"type": "header",
+    			"text": {
+    				"type": "plain_text",
+    				"text": "RDS MASTER PASSWORD UPDATED"
+    				
+    			}
+    		},
+    		{
+    			"type": "section",
+    			"fields": [
+    				{
+    					"type": "mrkdwn",
+    					"text": "*STATUS:*\n" + status
+    				},
+    				{
+    					"type": "mrkdwn",
+    					"text": "*ENV*\n" + env
+    				}
+    			]
+    		},
+    		{
+    			"type": "context",
+    			"elements": [
+    				{
+    					"type": "plain_text",
+    					"text": message
+    				}
+    			]
+    		},
+    		{
+    			"type": "section",
+    			"fields": [
+    				{
+    					"type": "mrkdwn",
+    					"text": "*When:*\n" + date
+    				}
+    			]
+    		}
+    	]
+    }
+    payload = json.dumps(pay)
+    return payload
+
+
+def slack_notification(status, message): 
     region = 'us-west-1'
-
-
-    url = "https://hooks.slack.com/services/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"
     
+    # For TESTing SET SLACk_URL 
+    SLACK_URL = "https://hooks.slack.com/services/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"
+
+   
+
     # Update the payload information 
-    payload = '{ \"attachments\":[\n      {\n         \"fallback\":\"Jenkins: <http://localhost:8080/|Open Jenkins Build server here>\",\n         \"pretext\":\"Jenkins: <http://localhost:8080/|Open Jenkins Build server here>\",\n         \"color\":\"#34bb13\",\n         \"fields\":[\n            {\n               \"title\":\"Password Reset\",\n               \"value\":\"Parmeter Store Password has been reset\"\n            }\n         ]\n      }\n   ]\n }'
+    
     headers = {
         'Content-Type': "application/json",
         'User-Agent': "PostmanRuntime/7.19.0",
@@ -39,7 +97,7 @@ def slack_notification():
         'Connection': "keep-alive",
         'cache-control': "no-cache"
         }
-    response = requests.request("POST", url, data=payload, headers=headers)
+    response = requests.request('POST', SLACK_URL, data=set_payload(status, message, DATE, ENV), headers=headers)
     print(response.text)
 
 def generate_pass():
@@ -50,26 +108,35 @@ def generate_pass():
     result_str = "".join((random.choice(source) for i in range(length)))
     return result_str
 
+def get_current_param(): 
+    ssm = boto3.client('ssm')
+
+    current_param = ssm.get_parameter(Name=SSM_PARAM, WithDecryption=True)
+    return current_param['Parameter']['Value']
+
 def update_parameter_store(new_password):
     ssm = boto3.client('ssm')
 
-    # Gets the current password set in parameter store
-    # Make sure to variablize the path string
-    parameter = ssm.get_parameter(Name=SSM_PARAM, WithDecryption=True)
-
     # Sets the new password in Parameter store
     try:
-      ssm.put_parameter(Name=SSM_PARAM, Value=new_password, Overwrite=True, Type='SecureString')
-      print("New Parameter Store Value: " + new_password)
       
+      ssm.put_parameter(Name=SSM_PARAM, Value=new_password, Overwrite=True, Type='SecureString')
+      print("Parameter Store Value Updated" + SSM_PARAM)
+      new_param = get_current_param()
     except:
       e = sys.exc_info()[0]
       print(e)
+      STATUS = "FAILED"
+      MESSAGE = E_MESSAGE[0] + " for" + SSM_PARAM
+      slack_notification(STATUS, MESSAGE)
       sys.exit()
-      
-
-    # Ensure the password has been set in parameter store by pulling the new password
-    parameter = ssm.get_parameter(Name=SSM_PARAM, WithDecryption=True)
+    
+    print(new_param)
+    print(new_password)
+    if new_param != new_password: 
+        STATUS = "FAILED"
+        slack_notification(STATUS, E_MESSAGE[1])
+        sys.exit()
 
 def reset_master_password(new_password):
     NEW = new_password
@@ -80,14 +147,24 @@ def reset_master_password(new_password):
             'max_attempts': 10,
             'mode': 'standard'
         })
-
-    client = boto3.client('rds', config=my_config)
-
     #Sets the new master password on the RDS DB instance
     try:
+        client = boto3.client('rds', config=my_config)
         response = client.modify_db_instance( DBInstanceIdentifier=DB_NAME, MasterUserPassword=NEW)
         print("Master Password Updated")
-        print("   value: " + NEW)
-        slack_notification()
+        
     except:
-        print("Error updating Master Password")
+        print("Updating Master Password FAILED")
+    
+    if response != "": 
+        STATUS = "SUCCESSFULL"
+        MESSAGE = S_MESSAGE
+    else: 
+        STATUS = "FAILED"
+        MESSAGE = E_MESSAGE[2] + DB_NAME
+    
+    slack_notification(STATUS, MESSAGE)
+
+    
+
+

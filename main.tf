@@ -113,7 +113,7 @@ data "archive_file" "lambda" {
 
 resource "aws_lambda_function" "function" {
   function_name = var.lambda_function
-  runtime       = "python3.8"
+  runtime       = "python3.7"
   role          = aws_iam_role.main.arn 
   handler = "lambda_function.lambda_handler"
   memory_size = 128 
@@ -127,7 +127,9 @@ resource "aws_lambda_function" "function" {
     variables = {
       "SSM_PARAMETER" = "/${var.ssm_parameter_value}",
       "DB_NAME" = "${var.db_name}", 
-      "REGION" = var.region
+      "REGION" = var.region, 
+      "SLACK_URL" = var.slack_url, 
+      "ENV" = var.environment
     }
   }
 

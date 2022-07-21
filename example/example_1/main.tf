@@ -11,4 +11,5 @@ module "Password-Rotation" {
   s3_key                         = "master_password_rotation/master_password_rotation.zip"
   ssm_parameter_value            = "test/db/password"
   db_name                        = "test-db"
+  slack_url = "https://hooks.slack.com/services/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"
 }

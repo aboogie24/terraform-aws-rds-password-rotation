@@ -157,7 +157,7 @@ def reset_master_password(new_password):
         print("Updating Master Password FAILED")
     
     if response != "": 
-        STATUS = "SUCCESFULL"
+        STATUS = "SUCCESSFULL"
         MESSAGE = S_MESSAGE
     else: 
         STATUS = "FAILED"

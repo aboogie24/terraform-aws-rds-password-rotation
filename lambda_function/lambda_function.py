@@ -74,7 +74,7 @@ def set_payload(status, message):
     return payload
 
 
-def slack_notification(): 
+def slack_notification(status, message): 
     region = 'us-west-1'
     
     # For TESTing SET SLACk_URL 
@@ -82,6 +82,7 @@ def slack_notification():
 
     url = "https://hooks.slack.com/services/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"
     
+    pay
 
     # Update the payload information 
     

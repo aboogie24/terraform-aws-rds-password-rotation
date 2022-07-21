@@ -26,7 +26,7 @@ def lambda_handler(event, context):
     reset_master_password(new_password)
 
 
-def set_payload(status, message): 
+def set_payload(status, message, date): 
     pay = {
     	"blocks": [
     		{
@@ -96,7 +96,7 @@ def slack_notification(status, message):
         'Connection': "keep-alive",
         'cache-control': "no-cache"
         }
-    response = requests.request("POST", url, data=set_payload(status, message), headers=headers)
+    response = requests.request("POST", url, data=set_payload(status, message, DATE), headers=headers)
     print(response.text)
 
 def generate_pass():

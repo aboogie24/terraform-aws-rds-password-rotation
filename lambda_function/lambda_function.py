@@ -81,7 +81,7 @@ def slack_notification(status, message):
     # For TESTing SET SLACk_URL 
     SLACK_URL = "https://hooks.slack.com/services/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"
 
-    url = "https://hooks.slack.com/services/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"
+   
 
     # Update the payload information 
     
